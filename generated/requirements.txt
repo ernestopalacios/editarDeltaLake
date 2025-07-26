@@ -1,0 +1,218 @@
+# requirements.txt
+streamlit==1.28.1
+streamlit-aggrid==0.3.4
+pandas==2.0.3
+pyspark==3.4.1
+delta-spark==2.4.0
+openpyxl==3.1.2
+
+# config.py - Configuration helper for different environments
+import os
+from pathlib import Path
+
+class DeltaConfig:
+    """Configuration class for Delta Lake settings"""
+    
+    @staticmethod
+    def get_spark_config(environment="local"):
+        """Get Spark configuration based on environment"""
+        
+        base_config = {
+            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+            "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+            "spark.sql.adaptive.enabled": "true",
+            "spark.sql.adaptive.coalescePartitions.enabled": "true"
+        }
+        
+        if environment == "local":
+            base_config.update({
+                "spark.master": "local[*]",
+                "spark.driver.memory": "4g",
+                "spark.executor.memory": "2g"
+            })
+        elif environment == "databricks":
+            # Databricks-specific configurations
+            base_config.update({
+                "spark.databricks.delta.preview.enabled": "true"
+            })
+        elif environment == "aws":
+            # AWS-specific configurations
+            base_config.update({
+                "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+                "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.DefaultAWSCredentialsProviderChain"
+            })
+        
+        return base_config
+    
+    @staticmethod
+    def get_sample_table_paths():
+        """Get sample table paths for different environments"""
+        return {
+            "local": "/tmp/delta-table",
+            "s3": "s3://your-bucket/delta-tables/your-table",
+            "azure": "abfss://container@account.dfs.core.windows.net/delta-tables/your-table",
+            "gcs": "gs://your-bucket/delta-tables/your-table",
+            "databricks": "/mnt/delta-tables/your-table"
+        }
+
+# docker-compose.yml - For easy setup with Docker
+version: '3.8'
+services:
+  streamlit-delta-editor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./delta-tables:/app/delta-tables
+    environment:
+      - SPARK_LOCAL_IP=127.0.0.1
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+
+# Dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install Java (required for PySpark)
+RUN apt-get update && apt-get install -y \
+    openjdk-11-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8501
+
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
+# setup.py - For package installation
+from setuptools import setup, find_packages
+
+setup(
+    name="delta-lake-editor",
+    version="1.0.0",
+    packages=find_packages(),
+    install_requires=[
+        "streamlit>=1.28.1",
+        "streamlit-aggrid>=0.3.4",
+        "pandas>=2.0.3",
+        "pyspark>=3.4.1",
+        "delta-spark>=2.4.0",
+        "openpyxl>=3.1.2"
+    ],
+    author="Your Name",
+    description="A Streamlit app for editing Delta Lake data with AgGrid",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    python_requires=">=3.8",
+)
+
+# README.md content
+# Delta Lake Data Editor
+
+A powerful Streamlit application for editing Delta Lake data using AgGrid with date filtering capabilities.
+
+## Features
+
+- 📊 **Interactive Data Grid**: Edit data directly in a professional AgGrid interface
+- 📅 **Date Filtering**: Filter data by date ranges for focused editing
+- 💾 **Delta Lake Integration**: Save changes directly back to Delta Lake using merge operations
+- 🔍 **Real-time Change Tracking**: See exactly what changes you're making before saving
+- 📤 **Export Options**: Download data in CSV, Excel, or JSON formats
+- ⚡ **Performance Optimized**: Handles large datasets with pagination and caching
+
+## Quick Start
+
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Run the application**:
+   ```bash
+   streamlit run app.py
+   ```
+
+3. **Configure your Delta table**:
+   - Enter your Delta table path in the sidebar
+   - Click "Load Table Info" to discover the schema
+   - Set up date filtering if needed
+   - Load your data and start editing!
+
+## Configuration
+
+### Environment Variables
+
+- `SPARK_LOCAL_IP`: Set to `127.0.0.1` for local development
+- `JAVA_HOME`: Path to Java installation (required for PySpark)
+
+### Delta Table Paths
+
+The app supports various Delta table locations:
+- Local filesystem: `/path/to/delta/table`
+- S3: `s3://bucket/path/to/table`
+- Azure: `abfss://container@account.dfs.core.windows.net/path/to/table`
+- GCS: `gs://bucket/path/to/table`
+
+### Usage Examples
+
+```python
+# Example table paths
+LOCAL_TABLE = "/tmp/my-delta-table"
+S3_TABLE = "s3://my-bucket/delta-tables/customer-data"
+AZURE_TABLE = "abfss://container@storage.dfs.core.windows.net/delta-tables/orders"
+```
+
+## Advanced Features
+
+### Batch Operations
+- Select multiple rows for bulk edits
+- Filter and sort data before editing
+- Undo/redo changes before saving
+
+### Data Validation
+- Automatic data type validation
+- Custom validation rules (can be extended)
+- Error handling and user feedback
+
+### Performance Optimization
+- Lazy loading with row limits
+- Caching for table metadata
+- Efficient change detection
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Java not found**: Install Java 8 or 11 and set JAVA_HOME
+2. **Delta table not found**: Verify your table path and permissions
+3. **Memory errors**: Reduce row limit or increase Spark driver memory
+4. **Serialization errors**: Ensure your data types are supported
+
+### Memory Configuration
+
+For large datasets, adjust Spark memory settings:
+```python
+spark.conf.set("spark.driver.memory", "8g")
+spark.conf.set("spark.executor.memory", "4g")
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details.
