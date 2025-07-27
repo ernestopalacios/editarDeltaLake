@@ -1,0 +1,6 @@
+# requirements.txt
+streamlit==1.28.1
+streamlit-aggrid==0.3.4
+pandas==2.0.3
+openpyxl==3.1.2
+deltalake==1.0.2
