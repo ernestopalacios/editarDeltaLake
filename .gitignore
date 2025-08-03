@@ -14,5 +14,6 @@ reporte_code.typ
 test
 state
 LOGS
+__marimo__
 # Private Keys
 eerssa/secret.py

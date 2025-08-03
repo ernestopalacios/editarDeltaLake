@@ -25,7 +25,7 @@ def _():
     return end_date, mo, start_date
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(end_date, mo, start_date):
     # 1. Check if the date range is valid
     if start_date.value <= end_date.value:
@@ -63,27 +63,51 @@ def _(mo):
 
 @app.cell
 def _(drop, mo):
-    mo.md(f"Valor seleccionado: {drop.value}")
+    mo.md(f"""Valor seleccionado: {drop.value}""")
     return
 
 
 @app.cell
 def _(mo):
-    user_form = mo.ui.form(
-        {
-            "name": mo.ui.text(label="Your Name:"),
-            "age": mo.ui.slider(start=18, stop=100, label="Your Age:")
-        }
+    # Create a form with multiple elements
+    form = (
+        mo.md('''
+        **Your form.**
+
+        {name}
+
+        {date}
+    ''')
+        .batch(
+            date=mo.ui.date(label="date"),
+            name=mo.ui.dropdown(
+                options={
+                    "Last 7 Days": "last_7",
+                    "Last 30 Days": "last_30",
+                    "This Month": "this_month",
+                    "Year to Date": "year_to_date",
+                    "Custom": "custom",
+                },
+                value="Custom",
+                label="Quick Select"
+                ),
+
+        )
+        .form(show_clear_button=True, bordered=False)
     )
-    return (user_form,)
+    return (form,)
 
 
 @app.cell
-def _(mo, user_form):
-    mo.vstack([
-        user_form,
-        mo.md(f"**Submitted data:** `{user_form.value}`")
-    ])
+def _(form):
+    # Instantiate a form directly
+    form
+    return
+
+
+@app.cell
+def _(form):
+    print(form.value['name'])
     return
 
 
